@@ -1,0 +1,28 @@
+# term_helper configuration reference.
+# Copy to ~/.config/term-helper/config.toml (or run `term-helper config init`).
+
+[general]
+# llama-server binary. Empty = look in $XDG_DATA_HOME/term-helper/llama.cpp,
+# then fall back to $PATH.
+llama_server = ""
+# Hard cap on executed commands per Ask.
+max_steps = 8
+# Shell history pulled into context.
+history_lines = 15
+history_max_chars = 200
+# Caps for file reads the model requests.
+read_max_lines = 200
+read_max_bytes = 16384
+# Token budget for the deep keybinding (Alt-:), which uses the same model.
+deep_max_tokens = 4096
+
+# The single, GPU-resident model used by both Alt-; and Alt-: .
+[server.suggest]
+base_url = "http://127.0.0.1:8080"
+model = "qwen2.5-coder-14b"
+extra_args = ["-ngl", "99", "--ctx-size", "8192"]
+
+# Explicit model path overrides, by model name. Otherwise the Core looks for
+# $XDG_DATA_HOME/term-helper/models/<name>.gguf
+[models]
+# qwen2.5-coder-14b = "/home/you/models/qwen2.5-coder-14b-q4_k_m.gguf"

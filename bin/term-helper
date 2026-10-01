@@ -1,0 +1,10 @@
+#!/bin/sh
+# term-helper launcher: run the Core from the repo without installing a package.
+self=$0
+case $self in
+  */*) ;;
+  *) self=$(command -v -- "$self" 2>/dev/null || echo "$self") ;;
+esac
+dir=$(CDPATH= cd -- "$(dirname -- "$self")" && pwd)
+root=$(CDPATH= cd -- "$dir/.." && pwd)
+PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m term_helper "$@"

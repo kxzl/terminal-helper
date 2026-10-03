@@ -18,6 +18,9 @@ function __term_helper_ask --description 'Ask the local model about the current 
     for __th_cmd in $__th_out
         history append -- "$__th_cmd"
     end
+    # fish's repaint moves the cursor up one line. Leave a blank line so it
+    # erases that instead of the helper's last line (the answer).
+    printf '\n' >&2
     commandline -f repaint
 end
 # Ctrl-G asks; Ctrl-Y asks with the larger budget. Both are control codes, so

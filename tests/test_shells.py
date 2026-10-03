@@ -13,6 +13,12 @@ class ShimBindingTest(unittest.TestCase):
             self.assertIn(ask, text, f"{shell}: Ctrl-G not bound")
             self.assertIn(deep, text, f"{shell}: Ctrl-Y not bound")
 
+    def test_fish_blank_line_before_repaint(self):
+        # fish's repaint erases the line above it; without a blank line it wipes
+        # the answer. The newline must come before commandline -f repaint.
+        text = shells.shim_text("fish")
+        self.assertIn("printf '\\n' >&2\n    commandline -f repaint", text)
+
 
 if __name__ == "__main__":
     unittest.main()

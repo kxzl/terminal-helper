@@ -281,6 +281,11 @@ def cmd_install(args) -> int:
         if server.unit_path("suggest").exists():
             server.systemctl("enable", cfg.role("suggest").systemd_unit)
             render.note("enabled term-helper-suggest.service")
+            # Pick up a changed unit (new hardening or key) on a running server.
+            if server.systemctl("is-active",
+                                cfg.role("suggest").systemd_unit).stdout.strip() == "active":
+                server.systemctl("restart", cfg.role("suggest").systemd_unit)
+                render.note("restarted term-helper-suggest.service")
     render.note("restart your shell, then press Ctrl-G at the prompt")
     return 0
 

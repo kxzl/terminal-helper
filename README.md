@@ -110,6 +110,10 @@ It looks at your CPU, RAM and GPU, recommends a model, and downloads it.
 
 Then restart your shell and press `Ctrl+G`.
 
+Re-run `./install.sh` any time to upgrade. It refreshes the shims and the
+systemd unit and keeps your config and models. To remove the shims, unit and
+launcher, run `./uninstall.sh`; your config and models are left in place.
+
 ## Models
 
 `install.sh` picks one of these based on what you're running:

@@ -187,9 +187,9 @@ def shot_suggest() -> str:
 
     tty = FakeTty()
     editor = prompt_mod.LineEditor(tty)
-    editor.lines = ["find word bannan in any files in current directory"]
-    editor.words = ["file", "files", "directory", "largest"]
-    editor._render("? ", "find word ban")
+    editor.lines = ["how many letter p's are in all files in this folder"]
+    editor.words = ["files", "folder", "letter"]
+    editor._render("? ", "how many letter p")
     return tty._out.getvalue()
 
 

@@ -96,14 +96,15 @@ def _trim(text: str) -> str:
     return text[: MAX_OUTPUT // 2] + "\n… truncated …\n" + text[-MAX_OUTPUT // 2:]
 
 
-def _handle_reads(step: dict, cfg, tty: Tty) -> str:
+def _handle_reads(step: dict, cfg, dry_run: bool = False) -> str:
+    """Read the files a step asks for. Local and side-effect free, so no prompt."""
     from term_helper.context import read_file
 
     collected = []
-    for path in step.get("reads", []):
-        answer = tty.prompt(f"  read {path}? [y/N] ").lower()
-        if answer != "y":
-            collected.append(f"$ read {path}\n(skipped)")
+    for path in step.get("reads", [])[:8]:  # ponytail: cap model fan-out
+        render.note(f"  ↳ read {path}")
+        if dry_run:
+            collected.append(f"$ read {path}\n(not read: dry run)")
             continue
         body = read_file(path, int(cfg.get("read_max_lines", 200)),
                          int(cfg.get("read_max_bytes", 16384)))
@@ -129,50 +130,52 @@ def run_plan(cfg, messages: list[dict], result: dict, *, cwd: str, shell: str = 
             stop = False
 
             for step in result.get("steps", []):
-                if len(executed) >= max_steps:
-                    render.warn(f"stopped: reached max_steps ({max_steps})")
-                    stop = True
-                    break
-
                 cmd = step["cmd"]
-                render.note(f"\n▶ {cmd}")
-                if step.get("why"):
-                    render.note(f"  {step['why']}")
-                if policy.classify(cmd) == policy.AUTO:
-                    render.note("  (read-only)")
-                elif step.get("risk") == "destructive":
-                    render.warn("  ! destructive")
 
-                if dry_run:
-                    render.note("  (dry run: not executed)")
-                    outputs.append(f"$ {cmd}\n(not executed)")
-                    continue
-
-                if not assume_yes:
-                    tty.write("  Run? [y/N] ")
-                    line = tty.readline()
-                    if line == "":            # EOF: never run an unreviewed command
+                if cmd:
+                    if len(executed) >= max_steps:
+                        render.warn(f"stopped: reached max_steps ({max_steps})")
                         stop = True
                         break
-                    if line.strip().lower() != "y":
-                        render.note("  (skipped)")
-                        audit.record({"event": "skip", "cmd": cmd})
-                        outputs.append(f"$ {cmd}\n(skipped)")
+                    render.note(f"\n▶ {cmd}")
+                    if step.get("why"):
+                        render.note(f"  {step['why']}")
+                    if policy.classify(cmd) == policy.AUTO:
+                        render.note("  (read-only)")
+                    elif step.get("risk") == "destructive":
+                        render.warn("  ! destructive")
+
+                    if dry_run:
+                        render.note("  (dry run: not executed)")
+                        outputs.append(f"$ {cmd}\n(not executed)")
                         continue
 
-                read_output = _handle_reads(step, cfg, tty)
+                    if not assume_yes:
+                        tty.write("  Run? [y/N] ")
+                        line = tty.readline()
+                        if line == "":        # EOF: never run an unreviewed command
+                            stop = True
+                            break
+                        if line.strip().lower() != "y":
+                            render.note("  (skipped)")
+                            audit.record({"event": "skip", "cmd": cmd})
+                            outputs.append(f"$ {cmd}\n(skipped)")
+                            continue
+
+                read_output = _handle_reads(step, cfg, dry_run)
                 if read_output:
                     outputs.append(read_output)
 
-                code, out = execute(cmd, cwd, tty, shell)
-                executed.append(cmd)
-                if out.strip():
-                    render.note(f"  → exit {code}")
-                else:
-                    render.note(f"  → exit {code}, no output")
-                audit.record({"event": "run", "cmd": cmd, "exit": code,
-                              "output": _trim(out)[:MAX_OUTPUT]})
-                outputs.append(f"$ {cmd}\n(exit {code})\n{_trim(out)}")
+                if cmd:
+                    code, out = execute(cmd, cwd, tty, shell)
+                    executed.append(cmd)
+                    if out.strip():
+                        render.note(f"  → exit {code}")
+                    else:
+                        render.note(f"  → exit {code}, no output")
+                    audit.record({"event": "run", "cmd": cmd, "exit": code,
+                                  "output": _trim(out)[:MAX_OUTPUT]})
+                    outputs.append(f"$ {cmd}\n(exit {code})\n{_trim(out)}")
 
             if stop or not continue_fn or len(executed) >= max_steps or iterations >= max_steps:
                 break

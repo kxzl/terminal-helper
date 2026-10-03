@@ -45,6 +45,17 @@ class ContractTest(unittest.TestCase):
         with self.assertRaises(contract.ContractError):
             contract.parse('{"mode":"search"}')
 
+    def test_read_only_step(self):
+        raw = ('{"mode":"plan","steps":[{"cmd":"","why":"look","risk":"read",'
+               '"reads":["~/.bashrc"]}]}')
+        step = contract.parse(raw)["steps"][0]
+        self.assertEqual(step["cmd"], "")
+        self.assertEqual(step["reads"], ["~/.bashrc"])
+
+    def test_step_with_neither_cmd_nor_reads_is_dropped(self):
+        with self.assertRaises(contract.ContractError):
+            contract.parse('{"mode":"plan","steps":[{"cmd":"","why":"x","risk":"read"}]}')
+
 
 if __name__ == "__main__":
     unittest.main()

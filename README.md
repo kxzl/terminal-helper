@@ -74,6 +74,19 @@ It plans a few steps when the job needs it:
   equal; a symlink is a separate file that points at a path.
 ```
 
+### When it needs to look
+
+If the answer depends on your setup, it reads the files first instead of
+guessing. Reads are local, so they don't ask for approval:
+
+```
+? how is git configured on this machine?
+
+  ↳ read ~/.gitconfig
+  ↳ read .git/config
+  ...
+```
+
 ### A web search
 
 ```
@@ -169,12 +182,18 @@ authenticated with a per-user API key generated at install time and kept at mode
 `0600` in the state directory, so a web page or another process can't just knock
 on the port and drive the model.
 
+File reads the model asks for happen automatically and stay on this machine.
+Only commands need approval, and only web search leaves the machine.
+
 ## Honest limitations
 
 - **The model is small and gets things wrong.** Read a command before you press
   `y`. The approval step is there precisely because the model can't be trusted
   on its own.
-- **It can invent file paths.** If a step offers to read a file, check the path.
+- **It reads files on its own.** When a question depends on your setup, the
+  model reads the relevant files to answer instead of guessing. Reads are local
+  and side-effect free, so they run without a prompt — but it may read a path
+  you didn't intend. Commands always ask first.
 - **No cloud model fallback.** If the local model can't do it, it can't do it.
 - **Web search is opt-in.** With it off, nothing leaves the machine. With it on,
   the search query does.

@@ -50,9 +50,9 @@ You are a terminal helper running on the user's Linux machine. The user asks a
 question from their shell prompt. Reply with ONE JSON object matching the
 provided schema and nothing else.
 
-Use mode="answer" ONLY for pure explanations that contain no commands at all.
-Never put shell commands inside the "answer" text, and never use code fences
-there.
+Use mode="answer" ONLY for pure explanations that need nothing from this
+machine. Never put shell commands inside the "answer" text, and never use code
+fences there.
 
 Use mode="plan" whenever the user asks you to do, find, list, show, change,
 install, delete, or run anything — even when a single command would do. Put the
@@ -62,6 +62,15 @@ commands in "steps". Each step is:
   risk  - "read" (no side effects), "write" (creates or modifies something), or
           "destructive" (deletes, overwrites, or is hard to undo).
   reads - optional list of file paths the step needs to read.
+
+You can read files on this machine; you cannot see it otherwise. Never answer a
+question about the user's own setup from memory — their shell, terminal, fonts,
+config files, installed packages, versions, paths or files. You will be wrong.
+Instead reply with mode="plan" and a read-only step (empty "cmd", "reads" set)
+for the files you need, then answer from their contents. For example, for "how
+do I change the font in fish?", read ~/.config/fish/config.fish and the
+terminal's config first. Any "how do I ..." question about this machine is
+mode="plan". File reads happen automatically and need no approval.
 
 Rules:
 - Prefer the fewest steps that finish the job.
@@ -166,14 +175,15 @@ def parse(raw: str) -> dict[str, Any]:
         if not isinstance(step, dict):
             continue
         cmd = str(step.get("cmd") or "").strip()
-        if not cmd:
+        reads = [str(p) for p in step.get("reads") or [] if str(p).strip()]
+        if not cmd and not reads:
             continue
         clean.append(
             {
                 "cmd": cmd,
                 "why": str(step.get("why") or "").strip(),
                 "risk": str(step.get("risk") or "write").strip().lower(),
-                "reads": [str(p) for p in step.get("reads") or [] if str(p).strip()],
+                "reads": reads,
             }
         )
     if not clean:

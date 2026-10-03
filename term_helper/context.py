@@ -118,6 +118,9 @@ def build_messages(cfg, *, shell: str, cwd: str, buffer: str, request: str,
         f"shell: {shell or 'unknown'}",
         f"os: {platform.system()} {platform.release()}",
     ]
+    model = cfg.role("suggest").model
+    if model:
+        lines.append(f"model: {model}")
     if buffer.strip():
         lines.append(f"current command line: {redact(buffer)}")
     git = git_summary(cwd)

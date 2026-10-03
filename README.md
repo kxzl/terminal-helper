@@ -100,11 +100,21 @@ It plans a few steps when the job needs it:
 
 ## Install
 
+From a checkout:
+
 ```sh
 ./install.sh
 ```
 
-It looks at your CPU, RAM and GPU, recommends a model, and downloads it.
+Or straight from GitHub, no clone:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kxzl/terminal-helper/main/install.sh | sh
+```
+
+It looks at your CPU, RAM and GPU, recommends a model, and downloads it. When
+run from a URL it fetches a checkout into `~/.local/share/term-helper/src`
+first.
 
 ![setup](docs/screenshots/setup.png)
 

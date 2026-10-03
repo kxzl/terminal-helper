@@ -5,6 +5,15 @@ case $self in
   */*) ;;
   *) self=$(command -v -- "$self" 2>/dev/null || echo "$self") ;;
 esac
+# Follow symlinks (e.g. ~/.local/bin/term-helper -> <repo>/bin/term-helper) so
+# the Core is found no matter which directory it is called from.
+while [ -L "$self" ]; do
+  target=$(readlink "$self") || break
+  case $target in
+    /*) self=$target ;;
+    *) self=$(dirname -- "$self")/$target ;;
+  esac
+done
 dir=$(CDPATH= cd -- "$(dirname -- "$self")" && pwd)
 root=$(CDPATH= cd -- "$dir/.." && pwd)
 PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m term_helper "$@"

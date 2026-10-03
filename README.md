@@ -77,14 +77,18 @@ It plans a few steps when the job needs it:
 ### When it needs to look
 
 If the answer depends on your setup, it reads the files first instead of
-guessing. Reads are local, so they don't ask for approval:
+guessing. Reads are local, so they don't ask for approval. If something needs
+changing, it proposes the commands and waits for a `y`:
 
 ```
-? how is git configured on this machine?
+? set my git commit name to "Roman"
 
   ↳ read ~/.gitconfig
-  ↳ read .git/config
-  ...
+
+  ▶ git config --global user.name "Roman"
+    set your commit name
+
+  Run? [y/N] y
 ```
 
 ### A web search

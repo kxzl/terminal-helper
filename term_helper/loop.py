@@ -185,10 +185,11 @@ def run_plan(cfg, messages: list[dict], result: dict, *, cwd: str, shell: str = 
                 "role": "user",
                 "content": (
                     "step results:\n\n" + "\n\n".join(outputs) +
-                    "\n\nIf the user asked for a change or a fix, reply with "
-                    "mode=\"plan\" and the commands that do it; the user approves "
-                    "each one. If they only asked for an explanation, reply with "
-                    "mode=\"answer\"."
+                    "\n\nA step marked (skipped) did not run — never claim it "
+                    "succeeded. If the user asked for a change or a fix, reply "
+                    "with mode=\"plan\" and the commands that do it; the user "
+                    "approves each one. If they only asked for an explanation, "
+                    "reply with mode=\"answer\"."
                 ),
             })
             render.note("\n… continuing")

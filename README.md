@@ -9,7 +9,7 @@ Everything stays on this machine. The model runs locally through
 cloud key and no telemetry. Web search is the one exception, and it is off until
 you turn it on.
 
-![asking a question](docs/screenshots/suggest.png)
+![one key, three kinds of reply](docs/screenshots/modes.png)
 
 ## Keys
 
@@ -42,6 +42,8 @@ model.
 ### Ask for a command
 
 Press `Ctrl+G`, type, press Enter:
+
+![typing a question with an inline suggestion](docs/screenshots/suggest.png)
 
 ```
 ? what's using port 8080?

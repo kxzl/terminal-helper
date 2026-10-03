@@ -5,13 +5,15 @@ Run from the repo root:  python3 tools/screenshots.py
 
 It drives the actual render/loop/prompt code with fixed input, feeds the ANSI
 through a minimal terminal emulator, and paints the result with Pillow. The
-pictures show what the tool really prints; only the model's reply is canned.
+pictures show what the tool really prints; only the model's reply is canned and
+the setup screenshot anonymizes the username and hardware.
 """
 
 from __future__ import annotations
 
 import io
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,8 +22,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+FONT_CANDIDATES = [
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"),
+    ("/usr/share/fonts/adwaita-mono-fonts/AdwaitaMono-Regular.ttf",
+     "/usr/share/fonts/adwaita-mono-fonts/AdwaitaMono-Bold.ttf"),
+    ("/usr/share/fonts/google-noto-vf/NotoSansMono[wght].ttf",
+     "/usr/share/fonts/google-noto-vf/NotoSansMono[wght].ttf"),
+    ("/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
+     "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Bold.ttf"),
+]
 SIZE = 17
 PAD = 22
 TITLEBAR = 40
@@ -98,8 +108,12 @@ class Screen:
 
 
 def render(screen: Screen, path: Path) -> None:
-    font = ImageFont.truetype(FONT, SIZE)
-    bold = ImageFont.truetype(FONT_BOLD, SIZE)
+    font = bold = ImageFont.load_default()
+    for regular, bold_path in FONT_CANDIDATES:
+        if Path(regular).exists() and Path(bold_path).exists():
+            font = ImageFont.truetype(regular, SIZE)
+            bold = ImageFont.truetype(bold_path, SIZE)
+            break
     adv = font.getlength("M")
     height = font.getbbox("Ag")[3] + 7
     lines = screen.rows
@@ -227,17 +241,91 @@ def shot_approve() -> str:
     return out.getvalue()
 
 
+def _anonymize(text: str) -> str:
+    """Replace the local username and hardware specs in captured output."""
+    text = text.replace(str(Path.home()), "/home/you")
+    text = re.sub(r"(?m)^(\x1b\[2m  CPU\s+)[^\x1b\n]*", r"\g<1>8 cores", text)
+    text = re.sub(r"(?m)^(\x1b\[2m  RAM\s+)[^\x1b\n]*", r"\g<1>32 GB", text)
+    text = re.sub(r"(?m)^(\x1b\[2m  GPU\s+)[^\x1b\n]*", r"\g<1>AMD Radeon (8 GB VRAM)", text)
+    return text
+
+
 def shot_setup() -> str:
     import subprocess
 
-    proc = subprocess.run([sys.executable, "-m", "term_helper", "setup"],
-                          input="\n", capture_output=True, text=True,
-                          env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parent.parent)})
-    return proc.stderr
+    from term_helper import config
+
+    # `setup` rewrites the config; put the user's copy back afterwards.
+    backup = config.CONFIG_PATH.read_bytes() if config.CONFIG_PATH.exists() else None
+    try:
+        proc = subprocess.run([sys.executable, "-m", "term_helper", "setup"],
+                              input="\n", capture_output=True, text=True,
+                              env={**os.environ,
+                                   "PYTHONPATH": str(Path(__file__).resolve().parent.parent)})
+    finally:
+        if backup is not None:
+            config.CONFIG_PATH.write_bytes(backup)
+    return _anonymize(proc.stderr)
+
+
+def shot_modes() -> str:
+    """The banner: one keypress, all three kinds of reply."""
+    import contextlib
+
+    from term_helper import config, loop, render
+
+    out = io.StringIO()
+
+    class FakeTty:
+        def __init__(self):
+            self.inputs = ["y\n"]
+
+        def write(self, text):
+            out.write(text)
+
+        def readline(self):
+            line = self.inputs.pop(0) if self.inputs else ""
+            out.write(line)
+            return line
+
+        def prompt(self, text):
+            self.write(text)
+            return self.readline().strip()
+
+        def close(self):
+            pass
+
+    real_tty, real_exec = loop.Tty, loop.execute
+    loop.Tty = FakeTty
+    loop.execute = lambda cmd, cwd, tty, shell="": (
+        0, 'LISTEN 0 4096 127.0.0.1:8080 0.0.0.0:* '
+           'users:(("llama-server",pid=4242,fd=9))\n')
+    try:
+        out.write("? what's using port 8080?\n")
+        plan = {"mode": "plan", "steps": [{
+            "cmd": "ss -ltnp 'sport = :8080'",
+            "why": "show the process listening on port 8080",
+            "risk": "read", "reads": []}]}
+        with contextlib.redirect_stderr(out):
+            loop.run_plan(config.default_config(), [], plan, cwd=".", shell="bash",
+                          continue_fn=None)
+    finally:
+        loop.Tty, loop.execute = real_tty, real_exec
+
+    out.write("\n? what's the difference between a hardlink and a symlink?\n\n")
+    out.write("  A hardlink is another name for the same inode, so the two names are\n")
+    out.write("  truly equal; a symlink is a separate file that points at a path.\n")
+
+    out.write("\n? what's the latest stable linux kernel version?\n\n")
+    with contextlib.redirect_stderr(out):
+        render.note("↗ web search (DuckDuckGo): latest stable linux kernel version")
+    out.write("  The latest stable release is ...\n")
+    return out.getvalue()
 
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    render(ansi_screen(shot_modes()), OUT / "modes.png")
     render(ansi_screen(shot_suggest()), OUT / "suggest.png")
     render(ansi_screen(shot_approve()), OUT / "approve.png")
     render(ansi_screen(shot_setup()), OUT / "setup.png")

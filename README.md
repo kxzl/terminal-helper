@@ -152,6 +152,10 @@ launcher, run `./uninstall.sh`; your config and models are left in place.
 | medium | Qwen3.5 9B | 5.7 GB | 8 GB RAM, ideally a GPU |
 | large | Qwen3.6 35B-A3B | 12.3 GB | 16 GB RAM + 12 GB VRAM to be quick |
 
+Medium is the minimum I'd pick for good results. It's the smallest model that
+reliably reads your setup and reasons about what it finds; tiny and small are
+for constrained machines and will make more mistakes.
+
 The large model is a mixture-of-experts, so only about 3B parameters are active
 per token; it stays usable even when part of it runs on CPU. If you have no GPU,
 pick a small model: CPU-only generation is a few tokens a second.

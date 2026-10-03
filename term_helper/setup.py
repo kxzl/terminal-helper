@@ -190,6 +190,11 @@ def ensure_llama() -> str:
     return str(dest / "llama-server")
 
 
+# Below this, the model still answers simple questions but struggles when it has
+# to read your setup and reason about it. The setup says so out loud.
+MIN_SMART = "medium"
+
+
 def choose(specs: Specs, assume_yes: bool, forced: str | None) -> dict:
     pick = forced or recommend(specs)
     if forced:
@@ -207,7 +212,12 @@ def choose(specs: Specs, assume_yes: bool, forced: str | None) -> dict:
     print("  Which model should it use?", file=sys.stderr)
     for i, entry in enumerate(CATALOG, 1):
         mark = "*" if entry["id"] == pick else " "
-        star = "  <- recommended" if entry["id"] == pick else ""
+        tags = []
+        if entry["id"] == pick:
+            tags.append("recommended")
+        if entry["id"] == MIN_SMART:
+            tags.append("minimum for good results")
+        star = ("  <- " + ", ".join(tags)) if tags else ""
         print(f"   {mark} {i}) {entry['name']:22} {entry['gb']:5.1f} GB   "
               f"{estimate(specs, entry):20} {entry['note']}{star}", file=sys.stderr)
     print(file=sys.stderr)
@@ -262,6 +272,10 @@ def cmd_setup(args) -> int:
     binary = ensure_llama()
     specs = detect(binary)
     entry = choose(specs, args.yes, args.model)
+    if entry["id"] in ("tiny", "small"):
+        render.warn("note: this model handles simple questions, but it will "
+                    "struggle when it has to read your setup and reason about "
+                    "it. The medium model is the recommended minimum.")
 
     target = models.models_dir() / entry["file"]
     if target.exists():

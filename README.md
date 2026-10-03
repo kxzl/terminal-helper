@@ -236,3 +236,8 @@ core with thin shims.
 The core (`term_helper/`) is Python 3.11+ and standard library only.
 `term_helper/policy.py` labels commands read-only or state-changing purely to
 inform your decision. It gates nothing.
+
+## License
+
+Public domain, via [the Unlicense](LICENSE). Take it and do whatever you want.
+

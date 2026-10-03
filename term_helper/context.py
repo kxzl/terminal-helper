@@ -137,7 +137,7 @@ def build_messages(cfg, *, shell: str, cwd: str, buffer: str, request: str,
     lines.append("")
     lines.append(f"request: {redact(request)}")
     return [
-        {"role": "system", "content": system_prompt(shell)},
+        {"role": "system", "content": system_prompt(shell, bool(cfg.get("web_search", False)))},
         {"role": "user", "content": "\n".join(lines)},
     ]
 

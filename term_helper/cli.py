@@ -9,7 +9,7 @@ import shutil
 import sys
 
 from term_helper import (audit, backend, config, context, contract, loop, models,
-                         prompt, render, server, setup, shells)
+                         prompt, render, search, server, setup, shells)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -122,6 +122,34 @@ def cmd_ask(args) -> int:
 
     audit.record({"event": "ask", "role": role_name, "request": request,
                   "mode": result["mode"]})
+
+    searches = 0
+    while result.get("mode") == "search":
+        if not cfg.get("web_search", False):
+            render.error("the model asked for a web search, but web_search is off")
+            render.note("enable it with `web_search = true` in config.toml")
+            return 1
+        if searches >= 2:
+            render.warn("search limit reached")
+            return 2
+        searches += 1
+        findings = search.run(cfg, result["query"])
+        audit.record({"event": "search", "query": result["query"]})
+        messages.append({"role": "assistant", "content": json.dumps(result)})
+        messages.append({
+            "role": "user",
+            "content": (f"web search results for {result['query']!r}:\n\n{findings}\n\n"
+                        "Answer the user's original request now. Reply with "
+                        "mode=\"answer\" or mode=\"plan\"."),
+        })
+        try:
+            with render.Status(prefix="reading results… ") as status:
+                raw = backend.chat(role, messages, on_token=stream(status),
+                                   max_tokens=max_tokens)
+        except backend.BackendError as exc:
+            render.error(str(exc))
+            return 1
+        result = contract.parse(raw)
 
     if result["mode"] == "answer":
         print(result["answer"], file=sys.stderr)
@@ -236,6 +264,7 @@ def cmd_doctor(args) -> int:
 def cmd_install(args) -> int:
     config.ensure_dirs()
     render.note(f"config: {config.write_default()}")
+    config.ensure_api_key()
     done = shells.install(args.shells)
     render.note(f"shims: {', '.join(done) or 'none detected'}")
 
@@ -244,7 +273,7 @@ def cmd_install(args) -> int:
     for name in cfg.roles:
         try:
             units.append(server.write_unit(cfg, name))
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, ValueError) as exc:
             render.warn(f"skipping {name} unit: {exc}")
     if units:
         server.systemctl("daemon-reload")
@@ -252,7 +281,7 @@ def cmd_install(args) -> int:
         if server.unit_path("suggest").exists():
             server.systemctl("enable", cfg.role("suggest").systemd_unit)
             render.note("enabled term-helper-suggest.service")
-    render.note("restart your shell, then press Alt-; at the prompt")
+    render.note("restart your shell, then press Ctrl-G at the prompt")
     return 0
 
 

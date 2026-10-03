@@ -6,6 +6,7 @@ Single source of truth for paths and the TOML config. Python 3.11+ (tomllib).
 from __future__ import annotations
 
 import os
+import secrets
 import shutil
 import tomllib
 from dataclasses import dataclass, field
@@ -27,6 +28,24 @@ CONFIG_PATH = CONFIG_DIR / "config.toml"
 AUDIT_PATH = STATE_DIR / "audit.jsonl"
 LOG_DIR = STATE_DIR / "log"
 PID_DIR = STATE_DIR / "run"
+API_KEY_PATH = STATE_DIR / "api-key"
+
+
+def api_key() -> str:
+    """The shared secret for the local llama-server, or "" if none is set."""
+    try:
+        return API_KEY_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def ensure_api_key() -> str:
+    """Create a per-user API key on first use (0600). Returns the key."""
+    if not api_key():
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        API_KEY_PATH.write_text(secrets.token_hex(32), encoding="utf-8")
+        API_KEY_PATH.chmod(0o600)
+    return api_key()
 
 DEFAULT_TOML = """\
 # term_helper configuration
@@ -42,6 +61,13 @@ read_max_lines = 200
 read_max_bytes = 16384
 # Token budget for the deep keybinding (Alt-:), which uses the same model.
 deep_max_tokens = 4096
+# Dynamic mode: the local model answers simple questions on its own. Opt in to
+# web search only if you accept that the question leaves this machine.
+web_search = false
+# Free default is DuckDuckGo. Set a Kagi API key to use Kagi instead; Kagi bills
+# per request, separately from a subscription. KAGI_API_KEY env overrides this.
+kagi_api_key = ""
+search_results = 5
 
 [server.suggest]
 base_url = "http://127.0.0.1:8080"

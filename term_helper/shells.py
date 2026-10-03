@@ -43,6 +43,11 @@ term_helper_ask() {
 term_helper_ask_deep() { term_helper_ask --deep }
 zle -N term_helper_ask
 zle -N term_helper_ask_deep
+# Ctrl-G asks; Ctrl-Y asks with the larger budget. Both are control codes, so
+# they work on any keyboard layout (no Shift needed).
+bindkey '^G' term_helper_ask
+bindkey '^Y' term_helper_ask_deep
+# Alt-; / Alt-: also work where the layout and terminal pass Alt through.
 bindkey '^[;' term_helper_ask
 bindkey '^[:' term_helper_ask_deep
 """
@@ -56,6 +61,11 @@ term_helper_ask() {
     [[ -n "$cmd" ]] && history -s -- "$cmd"
   done <<< "$out"
 }
+# Ctrl-G asks; Ctrl-Y asks with the larger budget. Both are control codes, so
+# they work on any keyboard layout (no Shift needed).
+bind -x '"\C-g": term_helper_ask'
+bind -x '"\C-y": term_helper_ask --deep'
+# Alt-; / Alt-: also work where the layout and terminal pass Alt through.
 bind -x '"\e;": term_helper_ask'
 bind -x '"\e:": term_helper_ask --deep'
 """

@@ -16,6 +16,15 @@ read_max_bytes = 16384
 # Token budget for the deep keybinding (Alt-:), which uses the same model.
 deep_max_tokens = 4096
 
+# Dynamic mode. The model already answers simple questions on its own; set
+# web_search = true to also let it search the web when it cannot answer locally.
+# That sends the question off this machine, so it is opt-in.
+web_search = false
+# Free default is DuckDuckGo. Set a Kagi API key to use Kagi instead; Kagi bills
+# per request, separately from a subscription. KAGI_API_KEY env overrides this.
+kagi_api_key = ""
+search_results = 5
+
 # The single, GPU-resident model used by both Alt-; and Alt-: .
 [server.suggest]
 base_url = "http://127.0.0.1:8080"

@@ -238,6 +238,9 @@ history_max_chars = 200
 read_max_lines = 200
 read_max_bytes = 16384
 deep_max_tokens = 4096
+web_search = false
+kagi_api_key = ""
+search_results = 5
 
 [server.suggest]
 base_url = "http://127.0.0.1:8080"
@@ -271,6 +274,7 @@ def cmd_setup(args) -> int:
 
     path = write_config(entry, specs)
     render.note(f"config: {path}")
+    config.ensure_api_key()
 
     installed = shells.install(args.shells)
     render.note(f"shims: {', '.join(installed) or 'none detected'}")
@@ -280,7 +284,7 @@ def cmd_setup(args) -> int:
     for name in cfg.roles:
         try:
             units.append(server.write_unit(cfg, name))
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, ValueError) as exc:
             render.warn(f"skipping {name} unit: {exc}")
     if units:
         server.systemctl("daemon-reload")

@@ -13,8 +13,9 @@ SHELL_LANGS = {"", "sh", "bash", "zsh", "fish", "shell", "console", "shell-sessi
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "mode": {"type": "string", "enum": ["answer", "plan"]},
+        "mode": {"type": "string", "enum": ["answer", "plan", "search"]},
         "answer": {"type": "string"},
+        "query": {"type": "string"},
         "steps": {
             "type": "array",
             "items": {
@@ -35,8 +36,8 @@ SCHEMA: dict[str, Any] = {
 # Fallback for llama-server builds without response_format support.
 GBNF = r"""
 root   ::= object
-object ::= "{" ws "\"mode\"" ws ":" ws mode ("," ws "\"answer\"" ws ":" ws string)? ("," ws "\"steps\"" ws ":" ws steps)? ws "}"
-mode   ::= "\"answer\"" | "\"plan\""
+object ::= "{" ws "\"mode\"" ws ":" ws mode ("," ws "\"answer\"" ws ":" ws string)? ("," ws "\"query\"" ws ":" ws string)? ("," ws "\"steps\"" ws ":" ws steps)? ws "}"
+mode   ::= "\"answer\"" | "\"plan\"" | "\"search\""
 steps  ::= "[" ws (step (ws "," ws step)*)? ws "]"
 step   ::= "{" ws "\"cmd\"" ws ":" ws string ws "," ws "\"why\"" ws ":" ws string ws "," ws "\"risk\"" ws ":" ws risk ws "}"
 risk   ::= "\"read\"" | "\"write\"" | "\"destructive\""
@@ -70,11 +71,29 @@ Rules:
 - The user's shell is {shell}. Prefer portable commands.
 - "risk" is only a hint; the user's tool classifies commands independently.
 - If you are unsure what the user wants, answer with mode="answer" and ask.
+{search_rules}"""
+
+SEARCH_ON = """\
+
+The user may also ask about current, real-time or external facts (news, prices,
+releases, "latest", a specific website) that you cannot know. When you need the
+web, reply with mode="search" and a short "query". Do not search for things
+about this machine — the context already covers those. After the results come
+back, answer the user.
+"""
+
+SEARCH_OFF = """\
+
+Web search is unavailable. If you cannot answer from what you know, say so in
+mode="answer"; never invent current facts.
 """
 
 
-def system_prompt(shell: str) -> str:
-    return SYSTEM_PROMPT.format(shell=shell or "unknown")
+def system_prompt(shell: str, web_search: bool = False) -> str:
+    return SYSTEM_PROMPT.format(
+        shell=shell or "unknown",
+        search_rules=SEARCH_ON if web_search else SEARCH_OFF,
+    )
 
 
 class ContractError(ValueError):
@@ -110,10 +129,16 @@ def parse(raw: str) -> dict[str, Any]:
         raise ContractError("model returned JSON that is not an object")
 
     mode = data.get("mode")
-    if mode not in ("answer", "plan"):
+    if mode not in ("answer", "plan", "search"):
         # Be forgiving: infer from the shape rather than failing outright.
         mode = "plan" if data.get("steps") else "answer"
     data["mode"] = mode
+
+    if mode == "search":
+        query = str(data.get("query") or "").strip()
+        if not query:
+            raise ContractError("search mode with no query")
+        return {"mode": "search", "query": query}
 
     if mode == "answer":
         answer = str(data.get("answer") or "").strip()

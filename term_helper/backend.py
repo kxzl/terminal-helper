@@ -6,6 +6,7 @@ import json
 import urllib.error
 import urllib.request
 
+from term_helper import config
 from term_helper.contract import GBNF, SCHEMA
 
 
@@ -37,9 +38,7 @@ def _payload(role, messages: list[dict], variant: str, stream: bool,
 def _request(role, messages, variant, stream, on_token, timeout, max_tokens) -> str:
     url = role.base_url.rstrip("/") + "/v1/chat/completions"
     data = json.dumps(_payload(role, messages, variant, stream, max_tokens)).encode("utf-8")
-    request = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    request = urllib.request.Request(url, data=data, headers=_headers())
     try:
         response = urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.HTTPError as exc:
@@ -90,10 +89,19 @@ def chat(role, messages, on_token=None, timeout: int = 300, max_tokens: int = 10
     raise last
 
 
+def _headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    key = config.api_key()
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
 def health(base_url: str, timeout: float = 2.0) -> bool:
     url = base_url.rstrip("/") + "/health"
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        request = urllib.request.Request(url, headers=_headers())
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return 200 <= response.status < 300
     except Exception:
         return False

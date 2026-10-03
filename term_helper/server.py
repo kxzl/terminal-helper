@@ -18,15 +18,43 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart={binary} -m {model_path} --host {host} --port {port} {extra}
+ExecStart={binary} -m {model_path}{api_key}{extra} --no-webui --no-slots --host {host} --port {port}
 Restart=on-failure
 RestartSec=3
 StandardOutput=append:{log}
 StandardError=append:{log}
 
+# Hardening: loopback-only, no privilege escalation, minimal filesystem.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={state_dir}
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+SystemCallArchitectures=native
+
 [Install]
 WantedBy=default.target
 """
+
+# Hosts we are willing to bind llama-server to. Anything else is a
+# misconfiguration that would expose an unauthenticated model server to the LAN.
+LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+# Flags that would undo the local-only / no-tools guarantees. Refused in
+# extra_args so a config edit cannot re-expose the server or give it shell tools.
+FORBIDDEN = {
+    "--tools", "--agent", "--mcp-servers", "--mcp-servers-config", "--media-path",
+    "--slot-save-path", "--api-key", "--api-key-file", "--cors-origins",
+    "--cors-methods", "--cors-headers",
+}
 
 
 def unit_dir() -> Path:
@@ -49,8 +77,32 @@ def has_systemd() -> bool:
 
 
 def _split_base(role) -> tuple[str, int]:
-    host = role.base_url.split("://", 1)[-1]
-    return host.rsplit(":", 1)[0], role.port
+    host = role.base_url.split("://", 1)[-1].rsplit(":", 1)[0].strip()
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if host not in LOOPBACK:
+        raise ValueError(
+            f"[server.{role.name}] base_url host '{host}' is not loopback; "
+            "term-helper only binds llama-server to this machine "
+            "(use 127.0.0.1 or ::1)"
+        )
+    return host, role.port
+
+
+def _extra_args(role) -> list[str]:
+    for arg in role.extra_args:
+        if arg.split("=", 1)[0] in FORBIDDEN:
+            raise ValueError(
+                f"refusing {arg!r} in [server.{role.name}] extra_args: it weakens "
+                "the local-only / no-tools guarantee"
+            )
+    return list(role.extra_args)
+
+
+def _api_key_args() -> list[str]:
+    if not config.api_key():
+        return []
+    return ["--api-key-file", str(config.API_KEY_PATH)]
 
 
 def write_unit(cfg, name: str) -> Path:
@@ -64,6 +116,8 @@ def write_unit(cfg, name: str) -> Path:
             f"then set [server.{name}] model"
         )
     host, port = _split_base(role)
+    extra = " ".join(shlex.quote(a) for a in _extra_args(role))
+    api_key = " ".join(shlex.quote(a) for a in _api_key_args())
     config.ensure_dirs()
     text = UNIT_TEMPLATE.format(
         name=name,
@@ -72,7 +126,9 @@ def write_unit(cfg, name: str) -> Path:
         model_path=shlex.quote(str(model_path)),
         host=host,
         port=port,
-        extra=" ".join(shlex.quote(a) for a in role.extra_args),
+        extra=(" " + extra) if extra else "",
+        api_key=(" " + api_key) if api_key else "",
+        state_dir=config.STATE_DIR,
         log=config.LOG_DIR / f"{name}.log",
     )
     path = unit_path(name)
@@ -91,8 +147,8 @@ def _spawn(cfg, role) -> None:
     config.ensure_dirs()
     log = (config.LOG_DIR / f"{role.name}.log").open("a", encoding="utf-8")
     proc = subprocess.Popen(
-        [cfg.llama_server, "-m", str(model_path), "--host", host, "--port", str(port),
-         *role.extra_args],
+        [cfg.llama_server, "-m", str(model_path), *_api_key_args(), *_extra_args(role),
+         "--no-webui", "--no-slots", "--host", host, "--port", str(port)],
         stdout=log, stderr=log, start_new_session=True,
     )
     (config.PID_DIR / f"{role.name}.pid").write_text(str(proc.pid))
@@ -103,6 +159,10 @@ def start(cfg, name: str, wait: float = 30.0) -> bool:
     if health(role.base_url):
         return True
     if unit_path(name).exists() and has_systemd():
+        try:
+            write_unit(cfg, name)  # refresh so the current API key is in the unit
+        except Exception:  # noqa: BLE001 - keep the existing unit if this fails
+            pass
         systemctl("start", role.systemd_unit)
     else:
         _spawn(cfg, role)

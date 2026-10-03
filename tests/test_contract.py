@@ -36,6 +36,15 @@ class ContractTest(unittest.TestCase):
         with self.assertRaises(contract.ContractError):
             contract.parse('{"mode":"plan","steps":[]}')
 
+    def test_search(self):
+        result = contract.parse('{"mode":"search","query":"arch linux news"}')
+        self.assertEqual(result["mode"], "search")
+        self.assertEqual(result["query"], "arch linux news")
+
+    def test_search_without_query_raises(self):
+        with self.assertRaises(contract.ContractError):
+            contract.parse('{"mode":"search"}')
+
 
 if __name__ == "__main__":
     unittest.main()

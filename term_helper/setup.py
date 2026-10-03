@@ -29,7 +29,7 @@ CATALOG: list[dict] = [
         "name": "Qwen3.5 2B",
         "repo": "unsloth/Qwen3.5-2B-GGUF",
         "file": "Qwen3.5-2B-Q4_K_M.gguf",
-        "gb": 1.19,
+        "gb": 1.28,
         "ram_gb": 3,
         "vram_gb": 0,
         "note": "runs on anything, including a 4 GB box",
@@ -39,30 +39,31 @@ CATALOG: list[dict] = [
         "name": "Granite 4.1 3B",
         "repo": "ibm-granite/granite-4.1-3b-GGUF",
         "file": "granite-4.1-3b-Q4_K_M.gguf",
-        "gb": 1.96,
+        "gb": 2.10,
         "ram_gb": 4,
         "vram_gb": 0,
         "note": "best documented JSON / tool-call reliability at this size",
     },
     {
         "id": "medium",
-        "name": "Qwen2.5-Coder 7B",
-        "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
-        "file": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
-        "gb": 4.36,
+        "name": "Qwen3.5 9B",
+        "repo": "unsloth/Qwen3.5-9B-GGUF",
+        "file": "Qwen3.5-9B-Q4_K_M.gguf",
+        "gb": 5.68,
         "ram_gb": 8,
         "vram_gb": 6,
-        "note": "clear step up in shell accuracy; wants a GPU",
+        "note": "strongest model under 10B; wants a GPU",
     },
     {
         "id": "large",
-        "name": "Qwen2.5-Coder 14B",
-        "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
-        "file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
-        "gb": 8.37,
+        "name": "Qwen3.6 35B-A3B",
+        "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+        "file": "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf",
+        "gb": 12.29,
+        "active_gb": 2.0,          # mixture-of-experts: ~3B active per token
         "ram_gb": 16,
         "vram_gb": 12,
-        "note": "best quality; needs a 12 GB+ GPU to be quick",
+        "note": "newest Qwen, mixture-of-experts so it stays quick",
     },
 ]
 
@@ -128,7 +129,9 @@ def recommend(specs: Specs) -> str:
 def estimate(specs: Specs, entry: dict) -> str:
     if specs.vram_gb and entry["gb"] <= specs.vram_gb * 0.8:
         return "fits your GPU"
-    rate = 25.0 / entry["gb"]          # rough CPU, memory-bandwidth bound
+    # CPU speed tracks the active weights, which is much smaller for a MoE.
+    weight = entry.get("active_gb", entry["gb"])
+    rate = 25.0 / weight               # rough CPU, memory-bandwidth bound
     return f"~{max(1, round(rate))} tok/s on CPU"
 
 
@@ -245,7 +248,7 @@ search_results = 5
 [server.suggest]
 base_url = "http://127.0.0.1:8080"
 model = "{model_name}"
-extra_args = ["-ngl", "{99 if on_gpu else 0}", "--ctx-size", "{8192 if on_gpu else 4096}"]
+extra_args = ["-ngl", "{99 if on_gpu else 0}", "--ctx-size", "{8192 if on_gpu else 4096}", "--reasoning", "off"]
 
 [models]
 """

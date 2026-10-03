@@ -116,14 +116,14 @@ Then restart your shell and press `Ctrl+G`.
 
 | | model | file | needs |
 |---|---|---|---|
-| tiny | Qwen3.5 2B | 1.2 GB | any machine, 4 GB RAM |
-| small | Granite 4.1 3B | 2.0 GB | 4 GB RAM |
-| medium | Qwen2.5-Coder 7B | 4.4 GB | 8 GB RAM, ideally a GPU |
-| large | Qwen2.5-Coder 14B | 8.4 GB | 16 GB RAM + 12 GB VRAM to be quick |
+| tiny | Qwen3.5 2B | 1.3 GB | any machine, 4 GB RAM |
+| small | Granite 4.1 3B | 2.1 GB | 4 GB RAM |
+| medium | Qwen3.5 9B | 5.7 GB | 8 GB RAM, ideally a GPU |
+| large | Qwen3.6 35B-A3B | 12.3 GB | 16 GB RAM + 12 GB VRAM to be quick |
 
-On a 16 GB AMD GPU the 14B generates at around 37 tok/s. On CPU alone it's
-closer to 3 tok/s, which is not pleasant. If you have no GPU, pick a small
-model.
+The large model is a mixture-of-experts, so only about 3B parameters are active
+per token; it stays usable even when part of it runs on CPU. If you have no GPU,
+pick a small model: CPU-only generation is a few tokens a second.
 
 ## Web search
 

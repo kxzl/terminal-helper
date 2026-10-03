@@ -252,20 +252,33 @@ def _anonymize(text: str) -> str:
 
 def shot_setup() -> str:
     import subprocess
+    import tempfile
 
-    from term_helper import config
+    from term_helper import config, setup
 
-    # `setup` rewrites the config; put the user's copy back afterwards.
-    backup = config.CONFIG_PATH.read_bytes() if config.CONFIG_PATH.exists() else None
-    try:
+    real_binary = config.DATA_DIR / "llama.cpp" / "llama-server"
+    with tempfile.TemporaryDirectory() as tmp:
+        # Run setup against a throwaway HOME, so it downloads nothing and never
+        # touches the real config, shims or systemd units.
+        root = Path(tmp) / "home"
+        data = root / ".local" / "share" / "term-helper"
+        (data / "models").mkdir(parents=True)
+        for entry in setup.CATALOG:      # every model looks already present
+            (data / "models" / entry["file"]).write_bytes(b"")
+        (data / "llama.cpp").mkdir()
+        if real_binary.exists():
+            (data / "llama.cpp" / "llama-server").symlink_to(real_binary)
+        env = {
+            **os.environ,
+            "HOME": str(root),
+            "XDG_DATA_HOME": str(root / ".local" / "share"),
+            "XDG_CONFIG_HOME": str(root / ".config"),
+            "XDG_STATE_HOME": str(root / ".local" / "state"),
+            "PYTHONPATH": str(Path(__file__).resolve().parent.parent),
+        }
         proc = subprocess.run([sys.executable, "-m", "term_helper", "setup"],
-                              input="\n", capture_output=True, text=True,
-                              env={**os.environ,
-                                   "PYTHONPATH": str(Path(__file__).resolve().parent.parent)})
-    finally:
-        if backup is not None:
-            config.CONFIG_PATH.write_bytes(backup)
-    return _anonymize(proc.stderr)
+                              input="\n", capture_output=True, text=True, env=env)
+    return _anonymize(proc.stderr.replace(str(root), str(Path.home())))
 
 
 def shot_modes() -> str:

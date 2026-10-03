@@ -28,8 +28,9 @@ search_results = 5
 # The single, GPU-resident model used by both Alt-; and Alt-: .
 [server.suggest]
 base_url = "http://127.0.0.1:8080"
-model = "qwen2.5-coder-14b"
-extra_args = ["-ngl", "99", "--ctx-size", "8192"]
+model = "Qwen3.6-35B-A3B-UD-Q2_K_XL"
+# "--reasoning off" keeps the Qwen3.5/3.6 thinking mode from eating the budget.
+extra_args = ["-ngl", "99", "--ctx-size", "8192", "--reasoning", "off"]
 
 # Explicit model path overrides, by model name. Otherwise the Core looks for
 # $XDG_DATA_HOME/term-helper/models/<name>.gguf

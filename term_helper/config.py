@@ -71,8 +71,8 @@ search_results = 5
 
 [server.suggest]
 base_url = "http://127.0.0.1:8080"
-model = "qwen2.5-coder-14b"
-extra_args = ["-ngl", "99", "--ctx-size", "8192"]
+model = "Qwen3.6-35B-A3B-UD-Q2_K_XL"
+extra_args = ["-ngl", "99", "--ctx-size", "8192", "--reasoning", "off"]
 
 [models]
 # Explicit overrides, name -> absolute path to a .gguf file:
